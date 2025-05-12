@@ -3,7 +3,7 @@ title: FastAPI × ALB 環境での HTTPS→HTTP リダイレクトによる CORS
 tags:
   - FastAPI
   - AWS
-  - Application Load Balancer
+  - Application-Load-Balancer
   - Uvicorn
   - CORS
 private: false
