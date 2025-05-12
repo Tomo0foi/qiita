@@ -1,12 +1,11 @@
 ---
-title: FastAPI × ALB 環境での HTTPS→HTTP リダイレクトによる CORS ヘッダー消失問題の原因と解決.md
+title: FastAPI × ALB 環境での HTTPS→HTTP リダイレクトによる CORS ヘッダー消失問題の原因と解決
 tags:
   - FastAPI
   - AWS
   - Application Load Balancer
   - Uvicorn
   - CORS
-  - X-Forwarded-Proto
 private: false
 updated_at: ''
 id: null
@@ -14,36 +13,35 @@ organization_url_name: null
 slide: false
 ignorePublish: false
 ---
-# FastAPI × ALB 環境での HTTPS→HTTP リダイレクトによる CORS ヘッダー消失問題の原因と解決
 
 ## はじめに
 AWS の Application Load Balancer（ALB）で HTTPS 終端を行い、バックエンド（FastAPI／Uvicorn）へは HTTP でリクエストを流す構成において、CORS エラーが発生する事例がありました。  
 原因は **HTTPS→HTTP へリダイレクトされる際に必要な `Access-Control-*` ヘッダーが欠落すること** にありました。この記事では、その原因と解決手順をまとめます。
 
----
-
 ## 問題の再現例
 
 1. ブラウザがプリフライト（OPTIONS）リクエストを発行  
-   ```http
+   ```bash
    OPTIONS https://request.example.com
    Origin: https://client.example.com
    ```
-2. ALB（HTTPS→HTTP 終端） → Uvicorn（HTTP:80）へ転送  
+
+2. ALB（HTTPS→HTTP 終端） → Uvicorn（HTTP:80）へ転送
+
 3. FastAPI がリダイレクトを返却  
    ```http
    HTTP/1.1 307 Temporary Redirect
    Location: http://request.example.com/
    ```
+
 4. ブラウザが HTTP 側へ再プリフライト  
-5. ALB の HTTP→HTTPS リダイレクトルール（301）で HTTPS に戻る  
-6. **一度も CORS ヘッダーが付与されず** ブラウザが  
+
+5. ALB の HTTP→HTTPS リダイレクトルール（301）で HTTPS に戻る
+
+6. **一度も CORS ヘッダーが付与されず** ブラウザが以下を出力して失敗
    ```
    No ‘Access-Control-Allow-Origin’ header is present on the requested resource.
    ```  
-   を出力して失敗
-
----
 
 ## 原因の詳細
 
@@ -53,8 +51,6 @@ AWS の Application Load Balancer（ALB）で HTTPS 終端を行い、バック�
   → ALB からの `X-Forwarded-Proto` を無視 → `request.url.scheme` が `http` のまま  
 - ブラウザは一度 HTTP エンドポイントへ飛び、CORS ミドルウェアを経由しないまま再リダイレクト  
 - 結果的に **CORS ヘッダーが一切付与されず** リクエストがブロック
-
----
 
 ## 解決方法
 
@@ -69,7 +65,7 @@ uvicorn app.main:app --reload --proxy-headers --forwarded-allow-ips="*"
 - `--proxy-headers`：X-Forwarded ヘッダーを処理  
 - `--forwarded-allow-ips="*"`：任意のプロキシ IP を信頼
 
-### 2. （必要に応じて）コード上で ProxyHeadersMiddleware を追加
+### 2. コード上で ProxyHeadersMiddleware を追加
 
 CLI オプションが使えない場合は、`main.py` に以下を挿入します。
 
@@ -79,8 +75,6 @@ from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 app = FastAPI()
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 ```
-
----
 
 ## まとめ
 
